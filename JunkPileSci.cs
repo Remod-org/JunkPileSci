@@ -1,4 +1,4 @@
-﻿#region License (GPL v3)
+#region License (GPL v3)
 /*
     DESCRIPTION
     Copyright (c) 2022 RFC1920 <desolationoutpostpve@gmail.com>
@@ -133,18 +133,18 @@ namespace Oxide.Plugins
             }
         }
 
-        //private void OnEntityKill(JunkPile pile)
-        //{
-        //    if (pile == null) return;
-        //    ulong botid = scijunk.ContainsKey(pile.net.ID) ? scijunk[pile.net.ID] : 0;
-        //    if (botid > 0)
-        //    {
-        //        DoLog($"Killing jps {botid.ToString()} associated with junkpile {pile.net.ID.ToString()}");
-        //        BaseNetworkable.serverEntities.Find((uint)botid)?.Kill();
-        //        scijunk.Remove(pile.net.ID);
-        //        scipos.Remove(botid);
-        //    }
-        //}
+        private void OnEntityKill(JunkPile pile)
+        {
+            if (pile == null) return;
+            ulong botid = scijunk.ContainsKey(pile.net.ID) ? scijunk[pile.net.ID] : 0;
+            if (botid > 0)
+            {
+                DoLog($"Killing jps {botid.ToString()} associated with junkpile {pile.net.ID.ToString()}");
+                BaseNetworkable.serverEntities.Find((uint)botid)?.Kill();
+                scijunk.Remove(pile.net.ID);
+                scipos.Remove(botid);
+            }
+        }
 
         private class ConfigData
         {
@@ -192,7 +192,7 @@ namespace Oxide.Plugins
             Puts("Creating new config file.");
             ConfigData config = new ConfigData()
             {
-                minDistance = 50f,
+                minDistance = 75f,
                 defaultHealth = 120f,
                 allowSafeZone = false,
                 hostile = false,
