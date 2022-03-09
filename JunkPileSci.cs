@@ -29,7 +29,7 @@ using Newtonsoft.Json;
 
 namespace Oxide.Plugins
 {
-    [Info("JunkPileSci", "RFC1920", "1.0.1")]
+    [Info("JunkPileSci", "RFC1920", "1.0.2")]
     [Description("A stopgap for early 2022 to add junkpile scientists back into the game")]
     internal class JunkPileSci : RustPlugin
     {
@@ -88,6 +88,11 @@ namespace Oxide.Plugins
         private void SpawnBot(Vector3 pos, ulong pileid)
         {
             if (pos == default(Vector3)) return;
+            if (BadLocation(pos))
+            {
+                DoLog("Possible floating junkpile.  Skipping...");
+                return;
+            }
             foreach (KeyValuePair<ulong, Vector3> sci in scipos.Where(x => Vector3.Distance(pos, x.Value) < configData.minDistance))
             {
                 DoLog("Too close to existing junkpile scientist.  Skipping...");
@@ -210,6 +215,13 @@ namespace Oxide.Plugins
         private void SaveConfig(ConfigData config)
         {
             Config.WriteObject(config, true);
+        }
+
+        private bool BadLocation(Vector3 location)
+        {
+            int layerMask = LayerMask.GetMask("Construction", "World", "Water");
+            RaycastHit hit;
+            return Physics.Raycast(new Ray(location, Vector3.down), out hit, 6f, layerMask);
         }
 
         public class JPRangeCheck : FacepunchBehaviour
