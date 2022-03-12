@@ -29,7 +29,7 @@ using Newtonsoft.Json;
 
 namespace Oxide.Plugins
 {
-    [Info("JunkPileSci", "RFC1920", "1.0.3")]
+    [Info("JunkPileSci", "RFC1920", "1.0.4")]
     [Description("A stopgap for early 2022 to add junkpile scientists back into the game")]
     internal class JunkPileSci : RustPlugin
     {
@@ -48,6 +48,47 @@ namespace Oxide.Plugins
         private void LMessage(IPlayer player, string key, params object[] args) => player.Reply(Lang(key, player.Id, args));
         #endregion
 
+        #region commands
+        [Command("jps")]
+        private void cmdJPS(IPlayer iplayer, string command, string[] args)
+        {
+            if (!iplayer.IsAdmin) return;
+            BasePlayer bp = iplayer.Object as BasePlayer;
+
+            if (configData.debug)
+            {
+                string debug = string.Join(",", args);
+                Puts($"{debug}");
+            }
+            if (args.Length == 1 && args[0] == "tp")
+            {
+                float minDist = Mathf.Infinity;
+                Vector3 target = Vector3.zero;
+                foreach (Vector3 loc in scipos.Values)
+                {
+                    float dist = Vector3.Distance(loc, bp.transform.position);
+                    if (dist < minDist)
+                    {
+                        target = loc;
+                        minDist = dist;
+                    }
+                }
+                if (target != Vector3.zero)
+                {
+                    Teleport(bp, target);
+                }
+                return;
+            }
+
+            string jplist = "";
+            foreach (KeyValuePair<ulong, Vector3> jps in scipos)
+            {
+                jplist += $"JPS {jps.Key.ToString()} at {jps.Value.ToString()}\n";
+            }
+            Message(iplayer, jplist);
+        }
+        #endregion
+
         protected override void LoadDefaultMessages()
         {
             lang.RegisterMessages(new Dictionary<string, string>
@@ -58,11 +99,32 @@ namespace Oxide.Plugins
 
         private void OnServerInitialized()
         {
+            AddCovalenceCommand("jps", "cmdJPS");
             permission.RegisterPermission(permUse, this);
             LoadConfigVariables();
 
             Instance = this;
             pluginReady = true;
+        }
+
+        public void Teleport(BasePlayer player, Vector3 position)
+        {
+            if (player.net?.connection != null)
+            {
+                player.SetPlayerFlag(BasePlayer.PlayerFlags.ReceivingSnapshot, true);
+            }
+
+            player.SetParent(null, true, true);
+            player.EnsureDismounted();
+            player.Teleport(position);
+            player.UpdateNetworkGroup();
+            player.StartSleeping();
+            player.SendNetworkUpdateImmediate(false);
+
+            if (player.net?.connection != null)
+            {
+                player.ClientRPCPlayer(null, player, "StartLoading");
+            }
         }
 
         private void DoLog(string message)
@@ -231,7 +293,7 @@ namespace Oxide.Plugins
 
         private bool BadLocation(Vector3 location)
         {
-            int layerMask = LayerMask.GetMask("Construction", "World", "Water");
+            int layerMask = LayerMask.GetMask("Water");
             RaycastHit hit;
             return Physics.Raycast(new Ray(location, Vector3.down), out hit, 6f, layerMask);
         }
@@ -250,21 +312,13 @@ namespace Oxide.Plugins
             public void FixedUpdate()
             {
                 if (bot == null) return;
-                if (!bot.Brain.Navigator.Agent.isOnNavMesh)
-                {
-                    Instance.scijunk.Remove(pileid);
-                    Instance.scipos.Remove(bot.net.ID);
-                    Instance.DoLog($"JPS at {bot?.transform.position.ToString()} not on navmesh.  Killing JPS.  Current count is {Instance.scipos.Count.ToString()}.");
-                    bot?.Kill();
-                    Destroy(this);
-                }
                 if (pileid > 0 && junkpile == null)
                 {
                     junkpile = BaseNetworkable.serverEntities.Find((uint)pileid) as JunkPile;
                 }
                 if (junkpile == null) return;
 
-                if (Vector3.Distance(bot.transform.position, junkpile.transform.position) > 30f || junkpile.IsDestroyed)
+                if (Vector3.Distance(bot.transform.position, junkpile.transform.position) > 50f || junkpile.IsDestroyed)
                 {
                     Instance.scijunk.Remove(pileid);
                     Instance.scipos.Remove(bot.net.ID);

@@ -3,6 +3,12 @@ As of late 2021 or early 2022, the junkpile scientists disappeared from Rust.  T
 
 We spawn a junk pile scientist at spawned junk piles based on a configured percentage.  Efforts have been made to ensure they are removed along with their associated junk pile or if they, for some reason, roam too far from it.
 
+## Commands
+These commands currently require admin:
+
+  -- `jps` -- Lists current junkpile scientists
+  -- `jps tp` -- Teleports admin to the closest junkpile scientist
+
 ## Configuration
 ```json
 {
