@@ -29,13 +29,14 @@ using Newtonsoft.Json;
 
 namespace Oxide.Plugins
 {
-    [Info("JunkPileSci", "RFC1920", "1.0.2")]
+    [Info("JunkPileSci", "RFC1920", "1.0.3")]
     [Description("A stopgap for early 2022 to add junkpile scientists back into the game")]
     internal class JunkPileSci : RustPlugin
     {
         private ConfigData configData;
         public static JunkPileSci Instance;
 
+        private bool pluginReady;
         private Dictionary<ulong, ulong> scijunk = new Dictionary<ulong, ulong>();
         private Dictionary<ulong, Vector3> scipos = new Dictionary<ulong, Vector3>();
         private const string sci = "assets/rust.ai/agents/npcplayer/humannpc/scientist/scientistnpc_junkpile_pistol.prefab";
@@ -61,6 +62,7 @@ namespace Oxide.Plugins
             LoadConfigVariables();
 
             Instance = this;
+            pluginReady = true;
         }
 
         private void DoLog(string message)
@@ -74,7 +76,7 @@ namespace Oxide.Plugins
             {
                 BaseNetworkable.serverEntities.Find((uint)jps.Value)?.Kill();
             }
-            DestroyAll<JPRangeCheck>();
+            DestroyAll<JPViableCheck>();
         }
 
         private void DestroyAll<T>() where T : MonoBehaviour
@@ -101,6 +103,7 @@ namespace Oxide.Plugins
             DoLog($"Spawning junkpile scientist at {pos.ToString()}");
             global::HumanNPC bot = (global::HumanNPC)GameManager.server.CreateEntity(sci, pos, new Quaternion(), true);
             bot.Spawn();
+
             if (bot.InSafeZone() && ! configData.allowSafeZone)
             {
                 DoLog("Junkpile scientist spawned in safe zone.  Removing...");
@@ -111,7 +114,7 @@ namespace Oxide.Plugins
 
             NextTick(() =>
             {
-                JPRangeCheck jpr = bot.gameObject.AddComponent<JPRangeCheck>();
+                JPViableCheck jpr = bot.gameObject.AddComponent<JPViableCheck>();
                 jpr.pileid = pileid;
                 bot.startHealth = configData.defaultHealth;
                 bot.Brain.Navigator.Agent.agentTypeID = -1372625422;
@@ -124,15 +127,24 @@ namespace Oxide.Plugins
                 bot.Brain.Navigator.BestRoamPointMaxDistance = configData.roamRange;
                 bot.Brain.Navigator.MaxRoamDistanceFromHome = configData.roamRange;
                 bot.Brain.Senses.Init(bot, configData.botMemory, configData.roamRange, configData.targetRange, -1f, true, false, true, configData.listenRange, true, false, true, EntityType.Player, false);
+
+                if (!bot.Brain.Navigator.Agent.isOnNavMesh)
+                {
+                    DoLog("JPS not spawned on navmesh.  Removing...");
+                    bot?.Kill();
+                    return;
+                }
             });
 
             scijunk.Add(pileid, bot.net.ID);
             scipos.Add(bot.net.ID, bot.transform.position);
+            DoLog($"Current JPS count is {scipos.Count.ToString()}");
         }
 
         private void OnEntitySpawned(JunkPile pile)
         {
-            if (UnityEngine.Random.Range(1, 101) > configData.spawnPercentage)
+            if (!pluginReady) return;
+            if (UnityEngine.Random.Range(1, 101) < configData.spawnPercentage)
             {
                 SpawnBot(pile.transform.position, pile.net.ID);
             }
@@ -224,7 +236,7 @@ namespace Oxide.Plugins
             return Physics.Raycast(new Ray(location, Vector3.down), out hit, 6f, layerMask);
         }
 
-        public class JPRangeCheck : FacepunchBehaviour
+        public class JPViableCheck : FacepunchBehaviour
         {
             public ulong pileid;
             private JunkPile junkpile;
@@ -238,6 +250,14 @@ namespace Oxide.Plugins
             public void FixedUpdate()
             {
                 if (bot == null) return;
+                if (!bot.Brain.Navigator.Agent.isOnNavMesh)
+                {
+                    Instance.scijunk.Remove(pileid);
+                    Instance.scipos.Remove(bot.net.ID);
+                    Instance.DoLog($"JPS at {bot?.transform.position.ToString()} not on navmesh.  Killing JPS.  Current count is {Instance.scipos.Count.ToString()}.");
+                    bot?.Kill();
+                    Destroy(this);
+                }
                 if (pileid > 0 && junkpile == null)
                 {
                     junkpile = BaseNetworkable.serverEntities.Find((uint)pileid) as JunkPile;
@@ -246,9 +266,9 @@ namespace Oxide.Plugins
 
                 if (Vector3.Distance(bot.transform.position, junkpile.transform.position) > 30f || junkpile.IsDestroyed)
                 {
-                    Instance.DoLog("Junkpile out of range or destroyed. Killing jps.");
                     Instance.scijunk.Remove(pileid);
                     Instance.scipos.Remove(bot.net.ID);
+                    Instance.DoLog($"Junkpile out of range or destroyed.  Killing JPS at {bot?.transform.position.ToString()}.  Current count is {Instance.scipos.Count.ToString()}.");
                     bot?.Kill();
                     Destroy(this);
                 }
