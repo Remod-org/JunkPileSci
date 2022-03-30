@@ -29,7 +29,7 @@ using Newtonsoft.Json;
 
 namespace Oxide.Plugins
 {
-    [Info("JunkPileSci", "RFC1920", "1.0.4")]
+    [Info("JunkPileSci", "RFC1920", "1.0.5")]
     [Description("A stopgap for early 2022 to add junkpile scientists back into the game")]
     internal class JunkPileSci : RustPlugin
     {
@@ -176,25 +176,32 @@ namespace Oxide.Plugins
 
             NextTick(() =>
             {
-                JPViableCheck jpr = bot.gameObject.AddComponent<JPViableCheck>();
-                jpr.pileid = pileid;
-                bot.startHealth = configData.defaultHealth;
-                bot.Brain.Navigator.Agent.agentTypeID = -1372625422;
-                bot.Brain.Navigator.DefaultArea = "Walkable";
-                bot.Brain.Navigator.Init(bot, bot.Brain.Navigator.Agent);
-                bot.Brain.ForceSetAge(0);
-                bot.Brain.TargetLostRange = configData.targetRange;
-                bot.Brain.HostileTargetsOnly = !configData.hostile;
-                bot.Brain.Navigator.BestCoverPointMaxDistance = 5;
-                bot.Brain.Navigator.BestRoamPointMaxDistance = configData.roamRange;
-                bot.Brain.Navigator.MaxRoamDistanceFromHome = configData.roamRange;
-                bot.Brain.Senses.Init(bot, configData.botMemory, configData.roamRange, configData.targetRange, -1f, true, false, true, configData.listenRange, true, false, true, EntityType.Player, false);
-
-                if (!bot.Brain.Navigator.Agent.isOnNavMesh)
+                try
                 {
-                    DoLog("JPS not spawned on navmesh.  Removing...");
-                    bot?.Kill();
-                    return;
+                    JPViableCheck jpr = bot.gameObject.AddComponent<JPViableCheck>();
+                    jpr.pileid = pileid;
+                    bot.startHealth = configData.defaultHealth;
+                    bot.Brain.Navigator.Agent.agentTypeID = -1372625422;
+                    bot.Brain.Navigator.DefaultArea = "Walkable";
+                    bot.Brain.Navigator.Init(bot, bot.Brain.Navigator.Agent);
+                    bot.Brain.ForceSetAge(0);
+                    bot.Brain.TargetLostRange = configData.targetRange;
+                    bot.Brain.HostileTargetsOnly = !configData.hostile;
+                    bot.Brain.Navigator.BestCoverPointMaxDistance = 5;
+                    bot.Brain.Navigator.BestRoamPointMaxDistance = configData.roamRange;
+                    bot.Brain.Navigator.MaxRoamDistanceFromHome = configData.roamRange;
+                    bot.Brain.Senses.Init(bot, configData.botMemory, configData.roamRange, configData.targetRange, -1f, true, false, true, configData.listenRange, true, false, true, EntityType.Player, false);
+
+                    if (!bot.Brain.Navigator.Agent.isOnNavMesh)
+                    {
+                        DoLog("JPS not spawned on navmesh.  Removing...");
+                        bot?.Kill();
+                        return;
+                    }
+                }
+                catch
+                {
+                    DoLog("Failed to setup brain for JPS.");
                 }
             });
 
